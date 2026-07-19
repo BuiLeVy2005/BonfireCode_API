@@ -1,0 +1,11 @@
+# === BỎ QUA THƯ MỤC BUILD CỦA C# ===
+[Bb]in/
+[Oo]bj/
+
+# === BỎ QUA FILE CẤU HÌNH MÔI TRƯỜNG ===
+appsettings.Development.json
+
+# === BỎ QUA CÁC FILE HỆ THỐNG CỦA VISUAL STUDIO ===
+.vs/
+*.user
+*.suo

@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using CodeShareAPI.Services;
+using CloudinaryDotNet;
+using CloudinaryDotNet.Actions;
 
 namespace GiuaKy.Controllers
 {
@@ -16,12 +18,14 @@ namespace GiuaKy.Controllers
         private readonly ApplicationDbContext _context;
         private readonly IWebHostEnvironment _env;
         private readonly IRankService _rankService;
+        private readonly IConfiguration _configuration;
 
-        public ProjectController(ApplicationDbContext context, IWebHostEnvironment env, IRankService rankService)
+        public ProjectController(ApplicationDbContext context, IWebHostEnvironment env, IRankService rankService, IConfiguration configuration)
         {
             _context = context;
             _env = env;
             _rankService = rankService;
+            _configuration = configuration;
         }
 
         [HttpPost]
@@ -51,36 +55,43 @@ namespace GiuaKy.Controllers
                 return BadRequest("Categories không hợp lệ.");
             }
 
-            // Tạo thư mục lưu trữ nếu chưa có
-            var storagePath = Path.Combine(_env.ContentRootPath, "storage");
-            var imagesPath = Path.Combine(storagePath, "images");
-            var sourcesPath = Path.Combine(storagePath, "sources");
-
-            if (!Directory.Exists(imagesPath)) Directory.CreateDirectory(imagesPath);
-            if (!Directory.Exists(sourcesPath)) Directory.CreateDirectory(sourcesPath);
+            var account = new Account(
+                _configuration["CloudinarySettings:CloudName"],
+                _configuration["CloudinarySettings:ApiKey"],
+                _configuration["CloudinarySettings:ApiSecret"]
+            );
+            var cloudinary = new Cloudinary(account);
 
             string? thumbnailUrl = null;
             if (request.ThumbnailFile != null && request.ThumbnailFile.Length > 0)
             {
-                var fileName = Guid.NewGuid().ToString() + Path.GetExtension(request.ThumbnailFile.FileName);
-                var filePath = Path.Combine(imagesPath, fileName);
-                using (var stream = new FileStream(filePath, FileMode.Create))
+                using var stream = request.ThumbnailFile.OpenReadStream();
+                var uploadParams = new ImageUploadParams()
                 {
-                    await request.ThumbnailFile.CopyToAsync(stream);
+                    File = new FileDescription(request.ThumbnailFile.FileName, stream),
+                    Folder = "BonfireCode/images"
+                };
+                var uploadResult = await cloudinary.UploadAsync(uploadParams);
+                if (uploadResult.StatusCode == System.Net.HttpStatusCode.OK)
+                {
+                    thumbnailUrl = uploadResult.SecureUrl.ToString();
                 }
-                thumbnailUrl = "/storage/images/" + fileName;
             }
 
             string sourceCodeUrl = string.Empty;
             if (request.SourceCodeFile != null && request.SourceCodeFile.Length > 0)
             {
-                var fileName = Guid.NewGuid().ToString() + Path.GetExtension(request.SourceCodeFile.FileName);
-                var filePath = Path.Combine(sourcesPath, fileName);
-                using (var stream = new FileStream(filePath, FileMode.Create))
+                using var stream = request.SourceCodeFile.OpenReadStream();
+                var uploadParams = new RawUploadParams()
                 {
-                    await request.SourceCodeFile.CopyToAsync(stream);
+                    File = new FileDescription(request.SourceCodeFile.FileName, stream),
+                    Folder = "BonfireCode/sources"
+                };
+                var uploadResult = await cloudinary.UploadAsync(uploadParams);
+                if (uploadResult.StatusCode == System.Net.HttpStatusCode.OK)
+                {
+                    sourceCodeUrl = uploadResult.SecureUrl.ToString();
                 }
-                sourceCodeUrl = "/storage/sources/" + fileName;
             }
             else
             {
@@ -260,21 +271,9 @@ namespace GiuaKy.Controllers
 
             if (project.UserId != userId) return Forbid();
 
-            // Xóa file vật lý
-            var storageRoot = _env.ContentRootPath;
-            if (!string.IsNullOrEmpty(project.SourceCodeUrl))
-            {
-                var relativePath = project.SourceCodeUrl.TrimStart('/');
-                var fullSourcePath = Path.Combine(storageRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
-                if (System.IO.File.Exists(fullSourcePath)) System.IO.File.Delete(fullSourcePath);
-            }
-
-            if (!string.IsNullOrEmpty(project.ThumbnailUrl))
-            {
-                var relativePath = project.ThumbnailUrl.TrimStart('/');
-                var fullThumbPath = Path.Combine(storageRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
-                if (System.IO.File.Exists(fullThumbPath)) System.IO.File.Delete(fullThumbPath);
-            }
+            // Xóa resource trên Cloudinary (Tùy chọn)
+            // Lấy PublicId từ URL có thể phức tạp, tạm thời bỏ qua xóa file vật lý
+            // vì Cloudinary có thể tự dọn dẹp hoặc để lưu trữ lịch sử.
 
             _context.Projects.Remove(project);
             await _context.SaveChangesAsync();

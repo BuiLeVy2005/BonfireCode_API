@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using CloudinaryDotNet;
+using CloudinaryDotNet.Actions;
 
 namespace GiuaKy.Controllers
 {
@@ -159,34 +161,41 @@ namespace GiuaKy.Controllers
             if (request.FullName != null) user.FullName = request.FullName;
             if (request.Bio != null) user.Bio = request.Bio;
 
+            var account = new Account(
+                _configuration["CloudinarySettings:CloudName"],
+                _configuration["CloudinarySettings:ApiKey"],
+                _configuration["CloudinarySettings:ApiSecret"]
+            );
+            var cloudinary = new Cloudinary(account);
+
             if (request.AvatarFile != null && request.AvatarFile.Length > 0)
             {
-                var storagePath = Path.Combine(_env.ContentRootPath, "storage");
-                var avatarsPath = Path.Combine(storagePath, "avatars");
-                if (!Directory.Exists(avatarsPath)) Directory.CreateDirectory(avatarsPath);
-
-                var fileName = Guid.NewGuid().ToString() + Path.GetExtension(request.AvatarFile.FileName);
-                var filePath = Path.Combine(avatarsPath, fileName);
-                using (var stream = new FileStream(filePath, FileMode.Create))
+                using var stream = request.AvatarFile.OpenReadStream();
+                var uploadParams = new ImageUploadParams()
                 {
-                    await request.AvatarFile.CopyToAsync(stream);
+                    File = new FileDescription(request.AvatarFile.FileName, stream),
+                    Folder = "BonfireCode/avatars"
+                };
+                var uploadResult = await cloudinary.UploadAsync(uploadParams);
+                if (uploadResult.StatusCode == System.Net.HttpStatusCode.OK)
+                {
+                    user.AvatarUrl = uploadResult.SecureUrl.ToString();
                 }
-                user.AvatarUrl = "/storage/avatars/" + fileName;
             }
 
             if (request.CoverFile != null && request.CoverFile.Length > 0)
             {
-                var storagePath = Path.Combine(_env.ContentRootPath, "storage");
-                var coversPath = Path.Combine(storagePath, "covers");
-                if (!Directory.Exists(coversPath)) Directory.CreateDirectory(coversPath);
-
-                var fileName = Guid.NewGuid().ToString() + Path.GetExtension(request.CoverFile.FileName);
-                var filePath = Path.Combine(coversPath, fileName);
-                using (var stream = new FileStream(filePath, FileMode.Create))
+                using var stream = request.CoverFile.OpenReadStream();
+                var uploadParams = new ImageUploadParams()
                 {
-                    await request.CoverFile.CopyToAsync(stream);
+                    File = new FileDescription(request.CoverFile.FileName, stream),
+                    Folder = "BonfireCode/covers"
+                };
+                var uploadResult = await cloudinary.UploadAsync(uploadParams);
+                if (uploadResult.StatusCode == System.Net.HttpStatusCode.OK)
+                {
+                    user.CoverUrl = uploadResult.SecureUrl.ToString();
                 }
-                user.CoverUrl = "/storage/covers/" + fileName;
             }
 
             await _context.SaveChangesAsync();

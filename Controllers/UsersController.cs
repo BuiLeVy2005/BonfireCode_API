@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using CloudinaryDotNet;
+using CloudinaryDotNet.Actions;
 using Data;
 using Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -13,11 +15,13 @@ namespace CodeShareAPI.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly IWebHostEnvironment _env;
+        private readonly IConfiguration _configuration;
 
-        public UsersController(ApplicationDbContext context, IWebHostEnvironment env)
+        public UsersController(ApplicationDbContext context, IWebHostEnvironment env, IConfiguration configuration)
         {
             _context = context;
             _env = env;
+            _configuration = configuration;
         }
 
         [HttpGet("{username}/profile")]
@@ -199,19 +203,29 @@ namespace CodeShareAPI.Controllers
                 return BadRequest(new { Message = "File không hợp lệ." });
             }
 
-            var storagePath = Path.Combine(_env.ContentRootPath, "storage");
-            var avatarsPath = Path.Combine(storagePath, "avatars");
-            if (!Directory.Exists(avatarsPath)) Directory.CreateDirectory(avatarsPath);
+            var account = new Account(
+                _configuration["CloudinarySettings:CloudName"],
+                _configuration["CloudinarySettings:ApiKey"],
+                _configuration["CloudinarySettings:ApiSecret"]
+            );
+            var cloudinary = new Cloudinary(account);
 
-            var fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
-            var filePath = Path.Combine(avatarsPath, fileName);
-            using (var stream = new FileStream(filePath, FileMode.Create))
+            using var stream = file.OpenReadStream();
+            var uploadParams = new ImageUploadParams()
             {
-                await file.CopyToAsync(stream);
+                File = new FileDescription(file.FileName, stream),
+                Folder = "BonfireCode/system_avatars"
+            };
+            
+            var uploadResult = await cloudinary.UploadAsync(uploadParams);
+            
+            if (uploadResult.StatusCode == System.Net.HttpStatusCode.OK)
+            {
+                var avatarUrl = uploadResult.SecureUrl.ToString();
+                return Ok(new { AvatarUrl = avatarUrl });
             }
 
-            var avatarUrl = "/storage/avatars/" + fileName;
-            return Ok(new { AvatarUrl = avatarUrl });
+            return BadRequest(new { Message = "Upload lên Cloudinary thất bại." });
         }
     }
 }

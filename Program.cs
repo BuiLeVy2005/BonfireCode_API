@@ -21,7 +21,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 // Đăng ký ApplicationDbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+    options.UseNpgsql(connectionString);
 });
 
 // Configure JWT Authentication

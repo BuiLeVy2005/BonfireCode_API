@@ -8,6 +8,10 @@ using Microsoft.OpenApi.Models;
 
 using CodeShareAPI.Services;
 
+// Fix Segfault 139 on Render Linux container
+Environment.SetEnvironmentVariable("DOTNET_USE_POLLING_FILE_WATCHER", "1");
+Environment.SetEnvironmentVariable("DOTNET_hostBuilder__reloadConfigOnChange", "false");
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.

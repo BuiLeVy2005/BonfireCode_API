@@ -23,6 +23,34 @@ namespace CodeShareAPI.Controllers
             _env = env;
             _configuration = configuration;
         }
+        [HttpGet("leaderboard")]
+        public async Task<IActionResult> GetLeaderboard()
+        {
+            var users = await _context.Users
+                .Include(u => u.Projects).ThenInclude(p => p.Ratings)
+                .Include(u => u.Projects).ThenInclude(p => p.Comments)
+                .Include(u => u.Rank)
+                .ToListAsync();
+
+            var leaderboard = users.Select(u => new
+            {
+                u.Id,
+                u.Username,
+                u.FullName,
+                u.AvatarUrl,
+                RankName = u.Rank != null ? u.Rank.Name : "Kẻ Lưu Đày",
+                TotalProjects = u.Projects.Count,
+                TotalStars = u.Projects.Sum(p => p.Ratings.Count),
+                TotalComments = u.Projects.Sum(p => p.Comments.Count),
+                Score = (u.Projects.Count * 5) + (u.Projects.Sum(p => p.Ratings.Count) * 10) + (u.Projects.Sum(p => p.Comments.Count) * 2)
+            })
+            .OrderByDescending(u => u.Score)
+            .Take(50)
+            .ToList();
+
+            return Ok(leaderboard);
+        }
+
 
         [HttpGet("{username}/profile")]
         public async Task<IActionResult> GetUserProfile(string username)

@@ -120,21 +120,24 @@ namespace GiuaKy.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetProjects([FromQuery] string? title, [FromQuery] int? categoryId)
+        public async Task<IActionResult> GetProjects([FromQuery] string? search, [FromQuery] List<int>? categoryIds)
         {
             var query = _context.Projects
                 .Include(p => p.User)
                 .Include(p => p.Categories)
                 .AsQueryable();
 
-            if (!string.IsNullOrEmpty(title))
+            if (!string.IsNullOrEmpty(search))
             {
-                query = query.Where(p => p.Title.Contains(title));
+                var lowerSearch = search.ToLower();
+                query = query.Where(p => p.Title.ToLower().Contains(lowerSearch) 
+                                      || p.Description.ToLower().Contains(lowerSearch)
+                                      || p.User.Username.ToLower().Contains(lowerSearch));
             }
 
-            if (categoryId.HasValue)
+            if (categoryIds != null && categoryIds.Any())
             {
-                query = query.Where(p => p.Categories.Any(c => c.Id == categoryId.Value));
+                query = query.Where(p => p.Categories.Any(c => categoryIds.Contains(c.Id)));
             }
 
             var projects = await query

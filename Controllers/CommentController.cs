@@ -41,8 +41,8 @@ namespace GiuaKy.Controllers
                     return Unauthorized(new { Message = "Không thể xác thực người dùng." });
                 }
 
-                var projectExists = await _context.Projects.AnyAsync(p => p.Id == request.ProjectId);
-                if (!projectExists)
+                var project = await _context.Projects.FirstOrDefaultAsync(p => p.Id == request.ProjectId);
+                if (project == null)
                 {
                     return NotFound(new { Message = "Project không tồn tại." });
                 }
@@ -56,6 +56,20 @@ namespace GiuaKy.Controllers
                 };
 
                 _context.Comments.Add(comment);
+
+                // Tạo thông báo cho chủ dự án
+                if (project.UserId != userId)
+                {
+                    var currentUser = await _context.Users.FindAsync(userId);
+                    _context.Notifications.Add(new Notification
+                    {
+                        UserId = project.UserId,
+                        Title = "Bình luận mới",
+                        Content = $"{currentUser?.Username ?? "Một người dùng"} đã bình luận vào đồ án {project.Title} của bạn.",
+                        ActionUrl = $"/detail.html?id={project.Id}"
+                    });
+                }
+
                 await _context.SaveChangesAsync();
 
                 // Award 2 Embers for commenting

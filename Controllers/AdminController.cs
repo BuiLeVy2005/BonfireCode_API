@@ -67,10 +67,24 @@ namespace CodeShareAPI.Controllers
         [HttpDelete("projects/{id}")]
         public async Task<IActionResult> DeleteProject(Guid id)
         {
-            var project = await _context.Projects.FindAsync(id);
+            var project = await _context.Projects
+                .Include(p => p.Comments)
+                .Include(p => p.Ratings)
+                .FirstOrDefaultAsync(p => p.Id == id);
+                
             if (project == null) return NotFound(new { Message = "Dự án không tồn tại." });
 
-            // Remove physical file
+            // Xóa các bảng liên kết bị dính khóa ngoại (Restrict)
+            if (project.Comments.Any())
+            {
+                _context.Comments.RemoveRange(project.Comments);
+            }
+            if (project.Ratings.Any())
+            {
+                _context.Ratings.RemoveRange(project.Ratings);
+            }
+
+            // Xóa file vật lý
             if (!string.IsNullOrEmpty(project.SourceCodeUrl))
             {
                 var relativePath = project.SourceCodeUrl.TrimStart('/');

@@ -153,7 +153,9 @@ namespace GiuaKy.Controllers
                     CategoryNames = p.Categories.Select(c => c.Name).ToList(),
                     AuthorName = p.User.Username,
                     AuthorAvatarUrl = p.User.AvatarUrl,
-                    DownloadCount = p.DownloadCount
+                    DownloadCount = p.DownloadCount,
+                    AverageRating = _context.Ratings.Where(r => r.ProjectId == p.Id).Any() ? _context.Ratings.Where(r => r.ProjectId == p.Id).Average(r => r.StarValue) : 0,
+                    TotalRatings = _context.Ratings.Count(r => r.ProjectId == p.Id)
                 })
                 .ToListAsync();
 

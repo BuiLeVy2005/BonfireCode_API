@@ -29,8 +29,8 @@ namespace GiuaKy.Controllers
 
         private async Task SendEmailAsync(string toEmail, string otp)
         {
-            var senderEmail = _configuration["EmailSettings:SenderEmail"];
-            var senderPassword = _configuration["EmailSettings:SenderPassword"];
+            var senderEmail = _configuration["EmailSettings:SenderEmail"] ?? "levy48934@gmail.com";
+            var senderPassword = _configuration["EmailSettings:SenderPassword"] ?? "ocgspdtqnmdykwcx";
             
             if (string.IsNullOrEmpty(senderEmail) || string.IsNullOrEmpty(senderPassword))
             {
